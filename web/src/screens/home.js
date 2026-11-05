@@ -5,6 +5,7 @@ import { icon, el, $, fmtKm, esc, remainingText, toast } from '../ui.js';
 import { geo } from '../geo.js';
 import { categorySheet, editKm, addFuel, goTo } from '../dialogs.js';
 import { Truck3D } from '../truck3d.js';
+import { drawCluster } from '../cluster.js';
 
 const HOTSPOTS = [
   { id: 'moteur', label: 'Moteur', icon: 'Cog', level: () => categoryLevel('moteur') },
@@ -34,9 +35,17 @@ export function init() {
         <button class="pill" id="h-veh">${icon('Truck', 18)}Véhicule</button>
       </header>
       <div class="stage" id="h-stage"><div class="hotspots" id="h-hotspots"></div></div>
+      <div class="cockpit-ui" id="h-cockpit">
+        <button class="pill cockpit-back" id="h-out">${icon('ChevronLeft', 18)}Retour</button>
+        <div class="cockpit-actions">
+          <button class="pill on" id="h-cfuel">${icon('Plus', 18)}Ajouter un plein</button>
+          <button class="pill" id="h-cconso">${icon('Gauge', 18)}Détails conso</button>
+        </div>
+      </div>
       <footer>
         <button class="pill km-chip" id="h-km">${icon('Gauge', 18)}<span></span></button>
         <button class="pill km-chip" id="h-fuel">${icon('Fuel', 18)}Plein</button>
+        <button class="pill km-chip" id="h-cock">${icon('Gauge', 18)}Cockpit</button>
         <button class="pill km-chip" id="h-plate"></button>
       </footer>
     </div>
@@ -66,6 +75,10 @@ export function init() {
       </div>
     </div>`;
 
+  $('#h-out', root).onclick = exitCockpit;
+  $('#h-cock', root).onclick = enterCockpit;
+  $('#h-cfuel', root).onclick = () => addFuel();
+  $('#h-cconso', root).onclick = () => goTo('vehicle', { tab: 'carburant' });
   $('#h-veh', root).onclick = () => goTo('vehicle', { tab: 'apercu' });
   $('#h-km', root).onclick = editKm;
   $('#h-fuel', root).onclick = () => addFuel();
@@ -90,7 +103,7 @@ export function init() {
   const layer = $('#h-hotspots', root);
   hotspotNodes = HOTSPOTS.map((h) => {
     const node = el(`<button class="hotspot" aria-label="${esc(h.label)}"><span class="sq">${icon(h.icon)}</span><span class="lbl">${esc(h.label)}</span></button>`);
-    node.onclick = () => categorySheet(h.id);
+    node.onclick = () => (h.id === 'carburant' && truck && truck.hasCockpit ? enterCockpit() : categorySheet(h.id));
     layer.appendChild(node);
     return { id: h.id, node, def: h };
   });
@@ -112,6 +125,7 @@ function initTruck() {
       modelUrl: state.settings.realModel && state.settings.quality !== 'low' ? 'models/scania.glb' : null,
     });
     truck.bindHotspots(hotspotNodes);
+    truck.setClusterDrawer(drawCluster);
     window.__truck = truck;
     truck.autoRotate = state.settings.autoRotate;
     truck._axles = state.truck.axles;
@@ -123,6 +137,24 @@ function initTruck() {
     return false;
   }
 }
+
+function enterCockpit() {
+  if (!truck || !truck.enterCockpit(() => root.querySelector('.home-truck').classList.add('in-cockpit'))) categorySheet('carburant');
+  else root.querySelector('.home-truck').classList.add('flying');
+}
+function exitCockpit() {
+  if (!truck) return;
+  const card = root.querySelector('.home-truck');
+  card.classList.remove('in-cockpit');
+  truck.exitCockpit(() => card.classList.remove('flying'));
+}
+export function resetCockpit() {
+  if (!truck) return;
+  truck.cancelCockpit();
+  root.querySelector('.home-truck').classList.remove('in-cockpit', 'flying');
+}
+export function isInCockpit() { return !!(truck && (truck.inCockpit || truck.anim)); }
+export function leaveCockpit() { if (truck && truck.inCockpit) { exitCockpit(); return true; } return false; }
 
 export function show() {
   if (truck === null) initTruck();
@@ -157,6 +189,7 @@ function refresh() {
     : '<small>Aucun entretien programmé</small>';
 
   if (truck) {
+    truck.redrawCluster();
     truck.setCabColor(t.cabColor);
     truck.setAccent(state.settings.accent);
     truck.autoRotate = state.settings.autoRotate;

@@ -31,6 +31,19 @@ function box(w, h, d, mat, x, y, z, r = 0) {
 const MODEL_ROT = Math.PI / 2;
 const MODEL_LENGTH = 6.3;
 const MODEL_CENTER_X = -0.3;
+// Points du trajet caméra pour le mode cockpit (repère du modèle normalisé)
+const COCKPIT = {
+  approach: [7.5, 3.0, -1.2],
+  approachLook: [2.4, 2.4, -0.5],
+  windshield: [3.6, 2.85, -0.5],
+  eye: [1.62, 2.86, -0.5],
+  look: [2.4, 2.5, -0.5],
+  cluster: [2.34, 2.52, -0.5],
+  clusterSize: [0.62, 0.24],
+  clusterTilt: 0.35,
+  fov: 58,
+};
+
 const MODEL_ANCHORS = [
   { id: 'moteur', u: 1.0, v: 0.45, w: 0, normal: [1, 0, 0] },
   { id: 'cabine', u: 0.74, v: 0.74, w: 1.02, normal: [0, 0, 1] },
@@ -383,6 +396,8 @@ export class Truck3D {
       this.model = model;
       this.truck.visible = false;
       this.defineModelHotspots();
+      this.buildCluster();
+      if (this.onModelReady) this.onModelReady();
       this.wake();
     }, undefined, (err) => console.warn('Modèle 3D non chargé, camion dessiné utilisé', err));
   }
@@ -414,7 +429,7 @@ export class Truck3D {
       case 'tire': return std({ color: 0x141414, metalness: 0, roughness: 0.92, envMapIntensity: 0.4 });
       case 'black': return std({ color: 0x0c0d0f, metalness: 0.15, roughness: 0.55, envMapIntensity: 0.8 });
       case 'interior': return std({ color: 0x2a2b2e, metalness: 0, roughness: 0.85, envMapIntensity: 0.5 });
-      case 'windowglass': return glass(0x0a0f17, 0.82, { metalness: 0.2 });
+      case 'windowglass': this.windowGlass = glass(0x0a0f17, 0.82, { metalness: 0.2 }); return this.windowGlass;
       case 'clearglass': return glass(0xffffff, 0.18);
       case 'orangeglass': return glass(0xff8a1a, 0.85, { emissive: new THREE.Color(0xff6a00), emissiveIntensity: 0.35 });
       case 'redglass': return glass(0xff1a1a, 0.85, { emissive: new THREE.Color(0xff0000), emissiveIntensity: 0.35 });
@@ -487,6 +502,13 @@ export class Truck3D {
 
   frame(t) {
     const c = this.controls;
+    if (this.anim || this.inCockpit) {
+      this.stepAnim(t);
+      this.ringMat.opacity = 0.4 + Math.sin(t / 700) * 0.2;
+      if (this.inCockpit && this.clusterDraw && t - (this.lastCluster || 0) > 500) { this.lastCluster = t; this.redrawCluster(); }
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
     // rotation lente gauche/droite après 4 s sans toucher
     if (this.autoRotate && !this.userInteracting && t - this.idleSince > 4000) {
       const target = this.baseAzimuth + Math.sin((t - this.t0) / 9000) * 0.55;
@@ -503,6 +525,108 @@ export class Truck3D {
     c.update();
     this.renderer.render(this.scene, this.camera);
     this.placeHotspots();
+  }
+
+  // ---------------- Mode cockpit : zoom de l'extérieur jusqu'au compteur ----------------
+  get hasCockpit() { return !!this.cluster; }
+
+  buildCluster() {
+    const W = 1024;
+    const H = 400;
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    this.clusterCanvas = canvas;
+    this.clusterTex = new THREE.CanvasTexture(canvas);
+    this.clusterTex.colorSpace = THREE.SRGBColorSpace;
+    this.clusterTex.anisotropy = 4;
+    const mat = new THREE.MeshBasicMaterial({ map: this.clusterTex, toneMapped: false });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(COCKPIT.clusterSize[0], COCKPIT.clusterSize[1]), mat);
+    plane.position.set(...COCKPIT.cluster);
+    plane.rotation.order = 'YXZ';
+    plane.rotation.y = -Math.PI / 2; // face au chauffeur (regarde -x)
+    plane.rotation.x = -COCKPIT.clusterTilt;
+    this.scene.add(plane);
+    this.cluster = plane;
+    this.redrawCluster();
+  }
+
+  setClusterDrawer(fn) { this.clusterDraw = fn; if (this.cluster) this.redrawCluster(); }
+
+  redrawCluster() {
+    if (!this.clusterCanvas) return;
+    const g = this.clusterCanvas.getContext('2d');
+    g.clearRect(0, 0, this.clusterCanvas.width, this.clusterCanvas.height);
+    if (this.clusterDraw) this.clusterDraw(g, this.clusterCanvas.width, this.clusterCanvas.height);
+    this.clusterTex.needsUpdate = true;
+    this.wake();
+  }
+
+  // Trajet de la caméra : position actuelle → devant le pare-brise → yeux du chauffeur
+  enterCockpit(done) {
+    if (!this.cluster || this.inCockpit || this.anim) return false;
+    this.saved = { pos: this.camera.position.clone(), target: this.controls.target.clone(), fov: this.camera.fov };
+    this.controls.enabled = false;
+    this.container.classList.add('cockpit');
+    const pos = new THREE.CatmullRomCurve3([this.camera.position.clone(), new THREE.Vector3(...COCKPIT.approach), new THREE.Vector3(...COCKPIT.windshield), new THREE.Vector3(...COCKPIT.eye)]);
+    const tgt = new THREE.CatmullRomCurve3([this.controls.target.clone(), new THREE.Vector3(...COCKPIT.approachLook), new THREE.Vector3(...COCKPIT.look)]);
+    this.startAnim(pos, tgt, this.camera.fov, COCKPIT.fov, 2200, 0.82, 0.3, () => { this.inCockpit = true; done && done(); });
+    return true;
+  }
+
+  exitCockpit(done) {
+    if (!this.inCockpit || this.anim) return;
+    this.inCockpit = false;
+    const s = this.saved;
+    const pos = new THREE.CatmullRomCurve3([this.camera.position.clone(), new THREE.Vector3(...COCKPIT.windshield), new THREE.Vector3(...COCKPIT.approach), s.pos]);
+    const tgt = new THREE.CatmullRomCurve3([this.controls.target.clone(), new THREE.Vector3(...COCKPIT.approachLook), s.target]);
+    this.startAnim(pos, tgt, this.camera.fov, s.fov, 1800, 0.3, 0.82, () => {
+      this.controls.enabled = true;
+      this.container.classList.remove('cockpit');
+      this.idleSince = performance.now();
+      done && done();
+    });
+  }
+
+  // Retour immédiat à la vue extérieure (quand on change d'écran)
+  cancelCockpit() {
+    if (!this.saved || (!this.inCockpit && !this.anim)) return;
+    this.anim = null;
+    this.inCockpit = false;
+    this.camera.position.copy(this.saved.pos);
+    this.controls.target.copy(this.saved.target);
+    this.camera.fov = this.saved.fov;
+    this.camera.near = 0.1;
+    this.camera.updateProjectionMatrix();
+    if (this.windowGlass) this.windowGlass.opacity = 0.82;
+    this.controls.enabled = true;
+    this.container.classList.remove('cockpit');
+    this.wake();
+  }
+
+  startAnim(posCurve, tgtCurve, fov0, fov1, ms, glass0, glass1, done) {
+    this.anim = { posCurve, tgtCurve, fov0, fov1, glass0, glass1, start: performance.now(), ms, done };
+    this.wake();
+  }
+
+  stepAnim(t) {
+    const a = this.anim;
+    if (!a) return;
+    let k = Math.min(1, (t - a.start) / a.ms);
+    if (k < 0) k = 0;
+    const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; // ease-in-out
+    this.camera.position.copy(a.posCurve.getPoint(e));
+    this.camera.fov = a.fov0 + (a.fov1 - a.fov0) * e;
+    this.camera.near = 0.03 + (1 - e) * 0.07;
+    this.camera.updateProjectionMatrix();
+    const target = a.tgtCurve.getPoint(e);
+    this.controls.target.copy(target);
+    this.camera.lookAt(target);
+    if (this.windowGlass) this.windowGlass.opacity = a.glass0 + (a.glass1 - a.glass0) * e;
+    if (k >= 1) {
+      this.anim = null;
+      a.done && a.done();
+    }
   }
 
   placeHotspots() {

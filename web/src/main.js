@@ -18,6 +18,7 @@ export function go(name, opts) {
   current = name;
   $$('.screen').forEach((s) => s.classList.toggle('active', s.id === `screen-${name}`));
   $$('.rail-btn[data-screen]').forEach((b) => b.classList.toggle('active', b.dataset.screen === name));
+  if (prev === 'home' && name !== 'home') home.resetCockpit();
   if (prev && prev !== name) screens[prev].hide?.();
   screens[name].show?.(opts);
 }
@@ -56,6 +57,7 @@ onChange(applyTheme);
 // ---- Retour / bouton Home (appelé par Android) ----
 window.__onBack = () => {
   if (closeTopModal()) return;
+  if (current === 'home' && home.leaveCockpit()) return;
   if (current !== 'home') go('home');
 };
 window.__onHome = () => {

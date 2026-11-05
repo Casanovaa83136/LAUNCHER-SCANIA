@@ -354,3 +354,14 @@ body.no-labels .hotspot .lbl { display: none; }
 .app .badge.on { background: #f59e0b; }
 .app .badge .ico { width: 1rem; height: 1rem; }
 @keyframes wiggle { from { transform: rotate(-1.2deg); } to { transform: rotate(1.2deg); } }
+
+/* Mode cockpit */
+.cockpit-ui { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity 0.4s; }
+.home-truck.in-cockpit .cockpit-ui { opacity: 1; }
+.home-truck.in-cockpit .cockpit-ui > * { pointer-events: auto; }
+.cockpit-back { position: absolute; left: 1rem; top: 1rem; background: rgba(0,0,0,0.55); padding: 0.6rem 1rem; font-size: 1rem; }
+.cockpit-actions { position: absolute; left: 1rem; right: 1rem; bottom: 1rem; display: flex; gap: 0.6rem; justify-content: center; }
+.cockpit-actions .pill { padding: 0.75rem 1.2rem; font-size: 1rem; background: rgba(0,0,0,0.55); }
+.cockpit-actions .pill.on { background: var(--accent); }
+.home-truck.flying .hotspots, .home-truck.flying > footer, .home-truck.flying > header { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+.home-truck > header, .home-truck > footer { transition: opacity 0.3s; }
