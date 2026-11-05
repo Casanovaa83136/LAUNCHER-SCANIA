@@ -73,7 +73,7 @@ function render() {
         </section>
         <section>
           <h3>${icon('Info', 20)}À propos</h3>
-          <p class="muted" style="font-size:.85rem">Launcher Scania — version ${esc(bridge.appVersion())}. Données saisies à la main (pas de liaison CAN). Les intervalles d'entretien proposés sont indicatifs.</p>
+          <p class="muted" style="font-size:.85rem">Launcher Scania — version ${esc(bridge.appVersion())}. Données saisies à la main (pas de liaison CAN). Les intervalles d'entretien proposés sont indicatifs.<br/>Photo de la planche de bord (vue cockpit) : Scania, licence CC BY-SA 4.0, via Wikimedia Commons.</p>
         </section>
       </div>
     </div>`;

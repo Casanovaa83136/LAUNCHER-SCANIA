@@ -44,3 +44,7 @@ Pour avoir la **vraie carte Google (avec trafic)** directement dans l'écran, cr
   Pour tester dans un navigateur : `cd app/src/main/assets/web && python3 -m http.server`, puis ouvrir `http://localhost:8000` (fenêtre 1024×600).
 - `app/` : application Android (Kotlin) : un WebView plein écran + un pont `Android` (liste/lancement des applis, icônes, navigation, touches média, sauvegarde).
 - L'APK est construit automatiquement par GitHub Actions (`.github/workflows/build.yml`), ou en local avec Android Studio.
+
+## Crédits
+
+- Photo de la planche de bord Scania Next Gen (vue cockpit) : **Scania**, licence [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), via [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:New_generetion_Scania_S_interior.jpg). Des données (vitesse, heure, consommation) sont affichées par-dessus.

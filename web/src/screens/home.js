@@ -6,6 +6,7 @@ import { geo } from '../geo.js';
 import { categorySheet, editKm, addFuel, goTo } from '../dialogs.js';
 import { Truck3D } from '../truck3d.js';
 import { drawCluster } from '../cluster.js';
+import { cockpitPhotoHtml, layoutCockpitPhoto, updateCockpitPhoto } from '../cockpitPhoto.js';
 
 const HOTSPOTS = [
   { id: 'moteur', label: 'Moteur', icon: 'Cog', level: () => categoryLevel('moteur') },
@@ -35,6 +36,7 @@ export function init() {
         <button class="pill" id="h-veh">${icon('Truck', 18)}Véhicule</button>
       </header>
       <div class="stage" id="h-stage"><div class="hotspots" id="h-hotspots"></div></div>
+      <div class="cockpit-photo">${cockpitPhotoHtml()}</div>
       <div class="cockpit-ui" id="h-cockpit">
         <button class="pill cockpit-back" id="h-out">${icon('ChevronLeft', 18)}Retour</button>
         <div class="cockpit-actions">
@@ -115,6 +117,7 @@ export function init() {
 
   onChange(refresh);
   refresh();
+  window.addEventListener('resize', () => layoutCockpitPhoto(root.querySelector('.home-truck')));
 }
 
 function initTruck() {
@@ -138,20 +141,34 @@ function initTruck() {
   }
 }
 
+let cpTimer = null;
+let photoTimer = null;
 function enterCockpit() {
-  if (!truck || !truck.enterCockpit(() => root.querySelector('.home-truck').classList.add('in-cockpit'))) categorySheet('carburant');
-  else root.querySelector('.home-truck').classList.add('flying');
+  const card = root.querySelector('.home-truck');
+  if (!truck || !truck.enterCockpit(() => card.classList.add('in-cockpit'))) { categorySheet('carburant'); return; }
+  card.classList.add('flying');
+  layoutCockpitPhoto(card);
+  updateCockpitPhoto(card);
+  // la photo de la vraie planche de bord apparaît quand la caméra traverse le pare-brise
+  clearTimeout(photoTimer);
+  photoTimer = setTimeout(() => card.classList.add('photo-on'), 1350);
+  clearInterval(cpTimer);
+  cpTimer = setInterval(() => updateCockpitPhoto(card), 1000);
 }
 function exitCockpit() {
   if (!truck) return;
   const card = root.querySelector('.home-truck');
-  card.classList.remove('in-cockpit');
-  truck.exitCockpit(() => card.classList.remove('flying'));
+  clearTimeout(photoTimer);
+  clearInterval(cpTimer);
+  card.classList.remove('in-cockpit', 'photo-on');
+  setTimeout(() => truck.exitCockpit(() => card.classList.remove('flying')), 350);
 }
 export function resetCockpit() {
   if (!truck) return;
   truck.cancelCockpit();
-  root.querySelector('.home-truck').classList.remove('in-cockpit', 'flying');
+  clearTimeout(photoTimer);
+  clearInterval(cpTimer);
+  root.querySelector('.home-truck').classList.remove('in-cockpit', 'flying', 'photo-on');
 }
 export function isInCockpit() { return !!(truck && (truck.inCockpit || truck.anim)); }
 export function leaveCockpit() { if (truck && truck.inCockpit) { exitCockpit(); return true; } return false; }
@@ -188,6 +205,7 @@ function refresh() {
     ? `<small>Prochain entretien</small><b class="lvl-${next.st.level}">${esc(next.i.name)}</b><small>${esc(remainingText(next.st))}</small><div class="bar ${next.st.level}"><i style="width:${Math.min(100, next.st.ratio * 100)}%"></i></div>`
     : '<small>Aucun entretien programmé</small>';
 
+  updateCockpitPhoto(root.querySelector('.home-truck'));
   if (truck) {
     truck.redrawCluster();
     truck.setCabColor(t.cabColor);
