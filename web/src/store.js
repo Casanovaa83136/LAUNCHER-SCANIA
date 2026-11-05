@@ -90,7 +90,7 @@ function defaultState() {
       accent: '#3b82f6',
       fullscreen: false,
       autoRotate: true,
-      quality: 'auto',
+      quality: 'high',
       googleMapsKey: '',
       mapStyle: 'dark',
       musicPkg: '',
@@ -131,6 +131,11 @@ function load() {
 }
 
 export const state = load();
+// v1.0.10 : nouveau modèle 3D haute définition, utilisé par défaut
+if (!state.settings.qualityV2) {
+  if (state.settings.quality === 'auto') state.settings.quality = 'high';
+  state.settings.qualityV2 = true;
+}
 
 const listeners = new Set();
 export const onChange = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };

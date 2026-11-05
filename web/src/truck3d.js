@@ -379,8 +379,19 @@ export class Truck3D {
 
       this.modelPaints = [];
       const cache = {};
+      // Export Sketchfab : les matériaux d'origine (vernis, ombrage intégré, chrome) sont bons, on les garde.
+      let authored = false;
+      model.traverse((o) => { if (o.isMesh && (o.material.aoMap || o.material.isMeshPhysicalMaterial)) authored = true; });
       model.traverse((o) => {
         if (!o.isMesh) return;
+        if (authored) {
+          this.tuneAuthoredMaterial(o.material);
+          // modèle allégé : on lisse la carrosserie (sinon petites bosses)
+          if (/scania\.glb$/.test(url) && o.material.name === 'carpaint') {
+            try { o.geometry = toCreasedNormals(o.geometry, Math.PI / 5); } catch (e) { /* on garde l'original */ }
+          }
+          return;
+        }
         const swap = (m) => {
           const key = m.name || m.uuid;
           if (!cache[key]) cache[key] = this.makeModelMaterial(m);
@@ -400,6 +411,20 @@ export class Truck3D {
       if (this.onModelReady) this.onModelReady();
       this.wake();
     }, undefined, (err) => console.warn('Modèle 3D non chargé, camion dessiné utilisé', err));
+  }
+
+  // Petites retouches sur les matériaux d'origine du modèle Sketchfab
+  tuneAuthoredMaterial(m) {
+    if (m.userData.tuned) return;
+    m.userData.tuned = true;
+    const n = (m.name || '').toLowerCase();
+    if (n === 'carpaint') {
+      m.color.set(this.cabColor);
+      this.modelPaints.push(m);
+    } else if (n === 'windowglass') {
+      this.windowGlass = m;
+    }
+    if (m.transparent) m.depthWrite = false;
   }
 
   // Le modèle fourni a des matériaux génériques (tout en plastique gris, vitres opaques) :

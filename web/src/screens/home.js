@@ -151,7 +151,7 @@ function initTruck() {
   try {
     truck = new Truck3D($('#h-stage', root), {
       cabColor: state.truck.cabColor, accent: state.settings.accent, axles: state.truck.axles, quality: state.settings.quality,
-      modelUrl: state.settings.realModel && state.settings.quality !== 'low' ? 'models/scania.glb' : null,
+      modelUrl: !state.settings.realModel || state.settings.quality === 'low' ? null : state.settings.quality === 'high' ? 'models/scania_hd.glb' : 'models/scania.glb',
     });
     truck.bindHotspots(hotspotNodes);
     truck.setClusterDrawer(drawCluster);
