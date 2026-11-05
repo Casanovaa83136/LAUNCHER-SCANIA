@@ -1,12 +1,13 @@
 // Écran d'accueil : camion 3D avec carrés d'entretien, musique, vitesse, raccourcis.
 import { state, onChange, categoryLevel, axleLevel, itemStatus, worstLevel } from '../store.js';
 import { bridge, KEY } from '../bridge.js';
-import { icon, el, $, fmtKm, esc, remainingText, toast } from '../ui.js';
+import { icon, el, $, fmtKm, esc, remainingText, toast, openModal } from '../ui.js';
 import { geo } from '../geo.js';
-import { categorySheet, editKm, addFuel, goTo } from '../dialogs.js';
+import { categorySheet, editKm, addFuel, goTo, maintenanceDone } from '../dialogs.js';
 import { Truck3D } from '../truck3d.js';
 import { drawCluster } from '../cluster.js';
-import { cockpitPhotoHtml, layoutCockpitPhoto, updateCockpitPhoto } from '../cockpitPhoto.js';
+import { cockpitPhotoHtml, layoutCockpitPhoto, updateCockpitPhoto, panelHtml, loadCustomPhoto, setCustomPhoto, clearCustomPhoto, hasCustomPhoto } from '../cockpitPhoto.js';
+
 
 const HOTSPOTS = [
   { id: 'moteur', label: 'Moteur', icon: 'Cog', level: () => categoryLevel('moteur') },
@@ -39,10 +40,9 @@ export function init() {
       <div class="cockpit-photo">${cockpitPhotoHtml()}</div>
       <div class="cockpit-ui" id="h-cockpit">
         <button class="pill cockpit-back" id="h-out">${icon('ChevronLeft', 18)}Retour</button>
-        <div class="cockpit-actions">
-          <button class="pill on" id="h-cfuel">${icon('Plus', 18)}Ajouter un plein</button>
-          <button class="pill" id="h-cconso">${icon('Gauge', 18)}Détails conso</button>
-        </div>
+        <button class="pill cockpit-cam" id="h-cam">${icon('Camera', 18)}Photo de ma cabine</button>
+        <input type="file" accept="image/*" id="h-photo" hidden />
+        <div class="cp-panel" id="h-panel"></div>
       </div>
       <footer>
         <button class="pill km-chip" id="h-km">${icon('Gauge', 18)}<span></span></button>
@@ -78,9 +78,28 @@ export function init() {
     </div>`;
 
   $('#h-out', root).onclick = exitCockpit;
-  $('#h-cock', root).onclick = enterCockpit;
-  $('#h-cfuel', root).onclick = () => addFuel();
-  $('#h-cconso', root).onclick = () => goTo('vehicle', { tab: 'carburant' });
+  $('#h-cock', root).onclick = () => enterCockpit('entretien');
+  $('#h-cam', root).onclick = photoMenu;
+  $('#h-photo', root).onchange = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      await setCustomPhoto(file);
+      layoutCockpitPhoto(root.querySelector('.home-truck'));
+      toast('Photo de ta cabine enregistrée', 'ok');
+    } catch (err) { toast('Impossible de lire cette photo', 'err'); }
+  };
+  $('#h-panel', root).addEventListener('click', (e) => {
+    const t = e.target.closest('[data-cptab],[data-cpact],[data-cpitem]');
+    if (!t) return;
+    if (t.dataset.cptab) { panelTab = t.dataset.cptab; renderPanel(); }
+    else if (t.dataset.cpact === 'fuel') addFuel();
+    else if (t.dataset.cpact === 'details') goTo('vehicle', { tab: 'carburant' });
+    else if (t.dataset.cpact === 'maint') goTo('vehicle', { tab: 'entretien' });
+    else if (t.dataset.cpitem) { const it = state.maintenance.find((x) => x.id === t.dataset.cpitem); if (it) maintenanceDone(it); }
+  });
+  loadCustomPhoto();
   $('#h-veh', root).onclick = () => goTo('vehicle', { tab: 'apercu' });
   $('#h-km', root).onclick = editKm;
   $('#h-fuel', root).onclick = () => addFuel();
@@ -105,7 +124,10 @@ export function init() {
   const layer = $('#h-hotspots', root);
   hotspotNodes = HOTSPOTS.map((h) => {
     const node = el(`<button class="hotspot" aria-label="${esc(h.label)}"><span class="sq">${icon(h.icon)}</span><span class="lbl">${esc(h.label)}</span></button>`);
-    node.onclick = () => (h.id === 'carburant' && truck && truck.hasCockpit ? enterCockpit() : categorySheet(h.id));
+    node.onclick = () => {
+      if (h.id === 'carburant' && truck && truck.hasCockpit) enterCockpit('conso');
+      else categorySheet(h.id);
+    };
     layer.appendChild(node);
     return { id: h.id, node, def: h };
   });
@@ -117,7 +139,11 @@ export function init() {
 
   onChange(refresh);
   refresh();
-  window.addEventListener('resize', () => layoutCockpitPhoto(root.querySelector('.home-truck')));
+  window.addEventListener('resize', () => {
+    const card = root.querySelector('.home-truck');
+    if (card.classList.contains('full')) Object.assign(card.style, { width: `${window.innerWidth}px`, height: `${window.innerHeight}px` });
+    layoutCockpitPhoto(card);
+  });
 }
 
 function initTruck() {
@@ -143,32 +169,92 @@ function initTruck() {
 
 let cpTimer = null;
 let photoTimer = null;
-function enterCockpit() {
+let panelTimer = null;
+let panelTab = 'conso';
+let placeholder = null;
+
+function renderPanel() { $('#h-panel', root).innerHTML = panelHtml(panelTab); }
+
+function photoMenu() {
+  const m = openModal({
+    title: 'Photo de ma cabine',
+    body: `<p class="muted">Pour un rendu comme dans un vrai camion : garé, assieds-toi au milieu de la couchette, mets l'appareil photo en <b>grand angle (0,5x)</b> et prends tout le tableau de bord en <b>paysage</b>, volant à gauche.</p>`,
+    actions: [
+      ...(hasCustomPhoto() ? [{ label: 'Photo par défaut', icon: 'Trash2', onClick: async () => { await clearCustomPhoto(); layoutCockpitPhoto(root.querySelector('.home-truck')); } }] : []),
+      { label: 'Choisir une photo', kind: 'primary', icon: 'Camera', onClick: () => { $('#h-photo', root).click(); } },
+    ],
+  });
+  return m;
+}
+
+// La carte du camion s'agrandit jusqu'au plein écran (et revient à sa place)
+function expandCard(card) {
+  const r = card.getBoundingClientRect();
+  placeholder = document.createElement('div');
+  placeholder.className = 'card-placeholder';
+  card.parentNode.insertBefore(placeholder, card);
+  Object.assign(card.style, { position: 'fixed', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, zIndex: 900 });
+  card.getBoundingClientRect();
+  card.classList.add('full');
+  Object.assign(card.style, { left: '0px', top: '0px', width: `${window.innerWidth}px`, height: `${window.innerHeight}px` });
+}
+function collapseCard(card, instant) {
+  if (!placeholder) return;
+  const r = placeholder.getBoundingClientRect();
+  const done = () => {
+    card.classList.remove('full', 'collapsing');
+    card.removeAttribute('style');
+    placeholder && placeholder.remove();
+    placeholder = null;
+    truck && truck.resize();
+  };
+  if (instant) { done(); return; }
+  card.classList.add('collapsing');
+  Object.assign(card.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+  setTimeout(done, 520);
+}
+
+function enterCockpit(tab = 'conso') {
   const card = root.querySelector('.home-truck');
-  if (!truck || !truck.enterCockpit(() => card.classList.add('in-cockpit'))) { categorySheet('carburant'); return; }
+  if (!truck || !truck.hasCockpit || truck.inCockpit || truck.anim) { if (!truck || !truck.hasCockpit) categorySheet('carburant'); return; }
+  panelTab = tab;
+  renderPanel();
   card.classList.add('flying');
-  layoutCockpitPhoto(card);
-  updateCockpitPhoto(card);
-  // la photo de la vraie planche de bord apparaît quand la caméra traverse le pare-brise
-  clearTimeout(photoTimer);
-  photoTimer = setTimeout(() => card.classList.add('photo-on'), 1350);
+  expandCard(card);
+  setTimeout(() => {
+    truck.enterCockpit(() => card.classList.add('in-cockpit'));
+    layoutCockpitPhoto(card);
+    updateCockpitPhoto(card);
+    clearTimeout(photoTimer);
+    clearTimeout(panelTimer);
+    // la photo apparaît quand la caméra passe à travers le toit, puis le panneau glisse depuis la droite
+    photoTimer = setTimeout(() => card.classList.add('photo-on'), 1550);
+    panelTimer = setTimeout(() => card.classList.add('panel-on'), 2500);
+  }, 450);
   clearInterval(cpTimer);
   cpTimer = setInterval(() => updateCockpitPhoto(card), 1000);
 }
+
 function exitCockpit() {
   if (!truck) return;
   const card = root.querySelector('.home-truck');
   clearTimeout(photoTimer);
+  clearTimeout(panelTimer);
   clearInterval(cpTimer);
-  card.classList.remove('in-cockpit', 'photo-on');
-  setTimeout(() => truck.exitCockpit(() => card.classList.remove('flying')), 350);
+  card.classList.remove('panel-on');
+  setTimeout(() => card.classList.remove('in-cockpit', 'photo-on'), 250);
+  setTimeout(() => truck.exitCockpit(() => { card.classList.remove('flying'); collapseCard(card); }), 600);
 }
+
 export function resetCockpit() {
   if (!truck) return;
   truck.cancelCockpit();
   clearTimeout(photoTimer);
+  clearTimeout(panelTimer);
   clearInterval(cpTimer);
-  root.querySelector('.home-truck').classList.remove('in-cockpit', 'flying', 'photo-on');
+  const card = root.querySelector('.home-truck');
+  card.classList.remove('in-cockpit', 'flying', 'photo-on', 'panel-on');
+  collapseCard(card, true);
 }
 export function isInCockpit() { return !!(truck && (truck.inCockpit || truck.anim)); }
 export function leaveCockpit() { if (truck && truck.inCockpit) { exitCockpit(); return true; } return false; }
@@ -206,6 +292,7 @@ function refresh() {
     : '<small>Aucun entretien programmé</small>';
 
   updateCockpitPhoto(root.querySelector('.home-truck'));
+  if (root.querySelector('.home-truck.panel-on')) renderPanel();
   if (truck) {
     truck.redrawCluster();
     truck.setCabColor(t.cabColor);

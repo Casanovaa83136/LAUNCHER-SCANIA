@@ -366,24 +366,46 @@ body.no-labels .hotspot .lbl { display: none; }
 .home-truck.flying .hotspots, .home-truck.flying > footer, .home-truck.flying > header { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
 .home-truck > header, .home-truck > footer { transition: opacity 0.3s; }
 
-/* Cockpit : vraie photo de la planche de bord */
-.cockpit-photo { position: absolute; inset: 0; z-index: 2; opacity: 0; pointer-events: none; transition: opacity 0.6s ease; overflow: hidden; border-radius: inherit; }
+/* Cockpit plein écran (photo large + panneau à droite) */
+.card-placeholder { min-width: 0; min-height: 0; }
+.home-truck.full { background: radial-gradient(80% 70% at 50% 40%, #2a3350, #0b1020 75%); border-color: transparent; border-radius: 0; transition: left .5s cubic-bezier(.3,.7,.2,1), top .5s cubic-bezier(.3,.7,.2,1), width .5s cubic-bezier(.3,.7,.2,1), height .5s cubic-bezier(.3,.7,.2,1), border-radius .5s; }
+.home-truck.collapsing { border-radius: var(--radius); }
+.cockpit-photo { position: absolute; inset: 0; z-index: 2; opacity: 0; pointer-events: none; transition: opacity 0.7s ease; overflow: hidden; }
 .home-truck.photo-on .cockpit-photo { opacity: 1; }
 .cp-wrap { position: absolute; inset: 0; overflow: hidden; background: #000; }
-.cp-photo { position: absolute; transform: scale(1.18); transform-origin: 50% 25%; transition: transform 1.2s cubic-bezier(.2,.7,.2,1); --s: 1; }
+.cp-photo { position: absolute; transform: scale(1.12) translateY(-3%); transform-origin: 35% 40%; transition: transform 1.6s cubic-bezier(.2,.7,.2,1); --s: 1; }
 .home-truck.photo-on .cp-photo { transform: none; }
-.cp-photo img { width: 100%; height: 100%; display: block; }
+.cp-photo img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.cp-photo.custom .cp-ov { display: none; }
+.cp-vignette { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(0,0,0,0) 45%, rgba(0,0,0,0.45) 100%), radial-gradient(120% 90% at 35% 45%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.5) 100%); }
 .cp-dial, .cp-lcd { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #fff; line-height: 1; }
 .cp-dial { border-radius: 50%; background: radial-gradient(circle, #05070b 62%, rgba(5,7,11,0.85) 72%, rgba(5,7,11,0) 76%); }
-.cp-dial b { font-size: calc(var(--s) * 10px); font-weight: 700; letter-spacing: -0.02em; text-shadow: 0 0 6px rgba(120,200,255,0.5); }
+.cp-dial b { font-size: calc(var(--s) * 10px); font-weight: 700; text-shadow: 0 0 6px rgba(120,200,255,0.5); }
 .cp-dial small { font-size: calc(var(--s) * 4.2px); color: rgba(255,255,255,0.65); margin-top: calc(var(--s) * 1.5px); }
 .cp-lcd { background: linear-gradient(180deg, #071223, #0a1a33); border-radius: calc(var(--s) * 2px); box-shadow: 0 0 calc(var(--s) * 3px) rgba(59,130,246,0.6) inset; gap: calc(var(--s) * 1.5px); }
 .cp-lcd b { font-size: calc(var(--s) * 13px); font-weight: 800; color: var(--accent); text-shadow: 0 0 8px currentColor; }
-.cp-lcd small { font-size: calc(var(--s) * 3.6px); color: rgba(255,255,255,0.7); letter-spacing: 0.04em; }
-.cp-hud { position: absolute; left: 0.8rem; right: 0.8rem; bottom: 4.6rem; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
-.cp-hud > div { background: rgba(8,12,22,0.72); border: 1px solid rgba(255,255,255,0.12); border-radius: 0.9rem; padding: 0.55rem 0.7rem; display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
-.cp-hud > div.wide { grid-column: 1 / -1; }
-.cp-hud small { font-size: 0.72rem; color: var(--muted); }
-.cp-hud b { font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cp-credit { position: absolute; right: 0.6rem; bottom: 0.3rem; font-size: 0.6rem; color: rgba(255,255,255,0.45); }
-.home-truck.photo-on .cockpit-ui { z-index: 4; }
+.cp-lcd small { font-size: calc(var(--s) * 3.8px); color: rgba(255,255,255,0.7); letter-spacing: 0.04em; }
+.cp-credit { position: absolute; left: 0.8rem; bottom: 0.4rem; font-size: 0.6rem; color: rgba(255,255,255,0.5); }
+.cockpit-ui { z-index: 4; }
+.cockpit-cam { position: absolute; left: 1rem; bottom: 1.4rem; background: rgba(0,0,0,0.55); padding: 0.6rem 1rem; font-size: 0.95rem; }
+.cp-panel {
+  position: absolute; top: 1rem; right: 1rem; bottom: 1rem; width: min(40%, 30rem);
+  background: rgba(16, 22, 38, 0.78); border: 1px solid rgba(255,255,255,0.14); border-radius: var(--radius);
+  padding: 1.1rem 1.1rem 0.9rem; display: flex; flex-direction: column; gap: 0.8rem;
+  transform: translateX(calc(100% + 2rem)); opacity: 0; transition: transform .55s cubic-bezier(.2,.8,.2,1), opacity .4s;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+}
+body.glass .cp-panel { backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.home-truck.panel-on .cp-panel { transform: none; opacity: 1; }
+.cp-p-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.6rem; }
+.cp-p-head h2 { font-size: 1.5rem; }
+.cp-p-head small { color: var(--muted); font-size: 0.85rem; }
+.cp-panel .stats { grid-template-columns: 1fr 1fr; gap: 0.45rem; }
+.cp-panel .stat { padding: 0.55rem 0.7rem; }
+.cp-panel .stat b { font-size: 1.05rem; }
+.cp-p-list { flex: 1; overflow-y: auto; margin: 0 -0.4rem; min-height: 0; }
+.cp-p-list .row-item { padding: 0.55rem 0.4rem; }
+.cp-p-actions { display: flex; gap: 0.5rem; }
+.cp-p-actions .btn { flex: 1; }
+.home-truck.flying > header, .home-truck.flying > footer, .home-truck.flying .hotspots { opacity: 0; pointer-events: none; }
+.cp-photo.custom ~ .cp-credit { display: none; }

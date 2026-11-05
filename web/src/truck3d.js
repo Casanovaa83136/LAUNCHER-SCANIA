@@ -33,15 +33,15 @@ const MODEL_LENGTH = 6.3;
 const MODEL_CENTER_X = -0.3;
 // Points du trajet caméra pour le mode cockpit (repère du modèle normalisé)
 const COCKPIT = {
-  approach: [7.5, 3.0, -1.2],
-  approachLook: [2.4, 2.4, -0.5],
-  windshield: [3.6, 2.85, -0.5],
-  eye: [1.62, 2.86, -0.5],
-  look: [2.4, 2.5, -0.5],
+  side: [5.0, 7.2, 4.2], // au-dessus, de côté
+  roof: [1.25, 7.4, 0.15], // à la verticale du toit
+  inside: [0.95, 3.15, 0], // dans la cabine, au fond, au centre (vue large du tableau de bord)
+  lookCab: [1.6, 2.6, 0],
+  look: [3.3, 2.35, 0],
   cluster: [2.34, 2.52, -0.5],
   clusterSize: [0.62, 0.24],
   clusterTilt: 0.35,
-  fov: 58,
+  fov: 62,
 };
 
 const MODEL_ANCHORS = [
@@ -546,6 +546,7 @@ export class Truck3D {
     plane.rotation.order = 'YXZ';
     plane.rotation.y = -Math.PI / 2; // face au chauffeur (regarde -x)
     plane.rotation.x = -COCKPIT.clusterTilt;
+    plane.visible = false; // remplacé par la photo de la vraie planche de bord
     this.scene.add(plane);
     this.cluster = plane;
     this.redrawCluster();
@@ -568,9 +569,10 @@ export class Truck3D {
     this.saved = { pos: this.camera.position.clone(), target: this.controls.target.clone(), fov: this.camera.fov };
     this.controls.enabled = false;
     this.container.classList.add('cockpit');
-    const pos = new THREE.CatmullRomCurve3([this.camera.position.clone(), new THREE.Vector3(...COCKPIT.approach), new THREE.Vector3(...COCKPIT.windshield), new THREE.Vector3(...COCKPIT.eye)]);
-    const tgt = new THREE.CatmullRomCurve3([this.controls.target.clone(), new THREE.Vector3(...COCKPIT.approachLook), new THREE.Vector3(...COCKPIT.look)]);
-    this.startAnim(pos, tgt, this.camera.fov, COCKPIT.fov, 2200, 0.82, 0.3, () => { this.inCockpit = true; done && done(); });
+    // comme dans un configurateur : on passe au-dessus du camion puis on plonge par le toit dans la cabine
+    const pos = new THREE.CatmullRomCurve3([this.camera.position.clone(), new THREE.Vector3(...COCKPIT.side), new THREE.Vector3(...COCKPIT.roof), new THREE.Vector3(...COCKPIT.inside)]);
+    const tgt = new THREE.CatmullRomCurve3([this.controls.target.clone(), new THREE.Vector3(...COCKPIT.lookCab), new THREE.Vector3(...COCKPIT.lookCab), new THREE.Vector3(...COCKPIT.look)]);
+    this.startAnim(pos, tgt, this.camera.fov, COCKPIT.fov, 2400, 0.82, 0.82, () => { this.inCockpit = true; done && done(); });
     return true;
   }
 
@@ -578,9 +580,9 @@ export class Truck3D {
     if (!this.inCockpit || this.anim) return;
     this.inCockpit = false;
     const s = this.saved;
-    const pos = new THREE.CatmullRomCurve3([this.camera.position.clone(), new THREE.Vector3(...COCKPIT.windshield), new THREE.Vector3(...COCKPIT.approach), s.pos]);
-    const tgt = new THREE.CatmullRomCurve3([this.controls.target.clone(), new THREE.Vector3(...COCKPIT.approachLook), s.target]);
-    this.startAnim(pos, tgt, this.camera.fov, s.fov, 1800, 0.3, 0.82, () => {
+    const pos = new THREE.CatmullRomCurve3([this.camera.position.clone(), new THREE.Vector3(...COCKPIT.roof), new THREE.Vector3(...COCKPIT.side), s.pos]);
+    const tgt = new THREE.CatmullRomCurve3([this.controls.target.clone(), new THREE.Vector3(...COCKPIT.lookCab), s.target]);
+    this.startAnim(pos, tgt, this.camera.fov, s.fov, 2000, 0.82, 0.82, () => {
       this.controls.enabled = true;
       this.container.classList.remove('cockpit');
       this.idleSince = performance.now();
