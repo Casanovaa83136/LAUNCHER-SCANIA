@@ -67,6 +67,9 @@ class MainActivity : ComponentActivity() {
         webView = WebView(this)
         webView.setBackgroundColor(Color.parseColor("#0B1020"))
         webView.overScrollMode = WebView.OVER_SCROLL_NEVER
+        // Pas de menu "sélection de texte" Android sur appui long : c'est l'interface qui gère l'appui long
+        webView.setOnLongClickListener { true }
+        webView.isHapticFeedbackEnabled = false
         with(webView.settings) {
             javaScriptEnabled = true
             domStorageEnabled = true

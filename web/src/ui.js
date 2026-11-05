@@ -128,26 +128,40 @@ export function readForm(root, fields) {
 
 // ---------- Notification ----------
 export function toast(msg, kind = '') {
+  document.querySelectorAll('.toast').forEach((o) => o.remove());
   const t = el(`<div class="toast ${kind}">${esc(msg)}</div>`);
   document.body.appendChild(t);
   requestAnimationFrame(() => t.classList.add('show'));
   setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2600);
 }
 
-// Appui long (pour les favoris)
-export function onLongPress(node, fn, ms = 550) {
+// Appui long (pour les favoris).
+// Sur Android, le WebView annule le toucher (pointercancel) vers 500 ms pour ouvrir son propre menu :
+// on déclenche donc à 450 ms, on n'annule PAS sur pointercancel, et l'évènement "contextmenu"
+// (appui long natif) déclenche aussi l'action.
+export function onLongPress(node, fn, ms = 450) {
   let timer = null;
   let fired = false;
   let sx = 0;
   let sy = 0;
+  const fire = (e) => {
+    clearTimeout(timer);
+    if (fired) return;
+    fired = true;
+    if (navigator.vibrate) { try { navigator.vibrate(30); } catch (err) { /* ignore */ } }
+    fn(e);
+  };
   node.addEventListener('pointerdown', (e) => {
     fired = false; sx = e.clientX; sy = e.clientY;
-    timer = setTimeout(() => { fired = true; fn(e); }, ms);
+    clearTimeout(timer);
+    timer = setTimeout(() => fire(e), ms);
   });
   const cancel = () => clearTimeout(timer);
   node.addEventListener('pointerup', cancel);
-  node.addEventListener('pointerleave', cancel);
-  node.addEventListener('pointermove', (e) => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 10) cancel(); });
-  node.addEventListener('contextmenu', (e) => e.preventDefault());
-  node.addEventListener('click', (e) => { if (fired) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+  node.addEventListener('pointermove', (e) => { if (Math.hypot(e.clientX - sx, e.clientY - sy) > 12) cancel(); });
+  node.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') cancel(); });
+  node.addEventListener('contextmenu', (e) => { e.preventDefault(); fire(e); });
+  node.addEventListener('click', (e) => {
+    if (fired) { e.stopImmediatePropagation(); e.preventDefault(); fired = false; }
+  }, true);
 }

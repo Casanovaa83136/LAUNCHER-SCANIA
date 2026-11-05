@@ -112,6 +112,7 @@ function initTruck() {
       modelUrl: state.settings.realModel && state.settings.quality !== 'low' ? 'models/scania.glb' : null,
     });
     truck.bindHotspots(hotspotNodes);
+    window.__truck = truck;
     truck.autoRotate = state.settings.autoRotate;
     truck._axles = state.truck.axles;
     return true;

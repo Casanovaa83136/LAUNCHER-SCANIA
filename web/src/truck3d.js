@@ -6,6 +6,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 function radialTexture(stops, size = 256) {
   const c = document.createElement('canvas');
@@ -57,7 +58,7 @@ export class Truck3D {
     renderer.setPixelRatio(quality === 'high' ? Math.min(dpr, 2) : quality === 'low' ? Math.min(dpr, 0.85) : Math.min(dpr, 1.25));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 0.92;
     renderer.domElement.className = 'truck-canvas';
     container.appendChild(renderer.domElement);
     this.renderer = renderer;
@@ -90,9 +91,9 @@ export class Truck3D {
     this.baseAzimuth = controls.getAzimuthalAngle();
 
     // Lumières
-    scene.add(new THREE.HemisphereLight(0xdfe9ff, 0x101318, 0.9));
-    const key = new THREE.DirectionalLight(0xffffff, 2.2);
-    key.position.set(6, 10, 7);
+    scene.add(new THREE.HemisphereLight(0xdfe9ff, 0x0d1016, 0.45));
+    const key = new THREE.DirectionalLight(0xfff6ea, 2.4);
+    key.position.set(9, 11, -3);
     scene.add(key);
     this.rim = new THREE.DirectionalLight(new THREE.Color(accent), 2.4);
     this.rim.position.set(-8, 4, -6);
@@ -364,32 +365,19 @@ export class Truck3D {
       this.modelBox = new THREE.Box3().setFromObject(model);
 
       this.modelPaints = [];
+      const cache = {};
       model.traverse((o) => {
         if (!o.isMesh) return;
-        const mats = Array.isArray(o.material) ? o.material : [o.material];
-        mats.forEach((m) => {
-          const n = (m.name || '').toLowerCase();
-          if (n === 'carpaint') {
-            m.color.set(this.cabColor);
-            m.metalness = 0.5;
-            m.roughness = 0.25;
-            this.modelPaints.push(m);
-          } else if (n.includes('glass') || n === 'windowglass') {
-            m.transparent = true;
-            m.opacity = n === 'clearglass' ? 0.35 : 0.75;
-            m.metalness = 0.9;
-            m.roughness = 0.05;
-            if (n === 'windowglass') m.color.set(0x0b1420);
-          } else if (n === 'chrome' || n === 'mirror') {
-            m.metalness = 1; m.roughness = 0.12;
-          } else if (n === 'rim') {
-            m.metalness = 0.9; m.roughness = 0.3;
-          } else if (n === 'tire') {
-            m.metalness = 0; m.roughness = 0.9;
-          }
-          if (n.includes('orange') || n === 'yellow') { m.emissive = new THREE.Color(0xff8a00); m.emissiveIntensity = 0.6; }
-          if (n === 'redglass' || n === 'red') { m.emissive = new THREE.Color(0xff1010); m.emissiveIntensity = 0.4; }
-        });
+        const swap = (m) => {
+          const key = m.name || m.uuid;
+          if (!cache[key]) cache[key] = this.makeModelMaterial(m);
+          return cache[key];
+        };
+        // Les normales d'origine de la carrosserie font des « bosses » : on les recalcule (angle vif conservé)
+        if (!Array.isArray(o.material) && o.material.name === 'carpaint') {
+          try { o.geometry = toCreasedNormals(o.geometry, Math.PI / 5); } catch (e) { /* on garde l'original */ }
+        }
+        o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material);
       });
       this.scene.add(model);
       this.model = model;
@@ -397,6 +385,46 @@ export class Truck3D {
       this.defineModelHotspots();
       this.wake();
     }, undefined, (err) => console.warn('Modèle 3D non chargé, camion dessiné utilisé', err));
+  }
+
+  // Le modèle fourni a des matériaux génériques (tout en plastique gris, vitres opaques) :
+  // on les remplace par de vrais matériaux PBR selon leur nom.
+  makeModelMaterial(src) {
+    const n = (src.name || '').toLowerCase();
+    const base = src.color ? src.color.clone() : new THREE.Color(0x888888);
+    const alpha = src.opacity !== undefined && src.opacity < 1 ? src.opacity : 1;
+    const std = (o) => new THREE.MeshStandardMaterial({ color: base, ...o });
+    const glass = (color, opacity, extra = {}) => new THREE.MeshPhysicalMaterial({
+      color, metalness: 0, roughness: 0.03, transparent: true, opacity, depthWrite: false,
+      clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2.2, side: THREE.DoubleSide, ...extra,
+    });
+    switch (n) {
+      case 'carpaint': {
+        const m = new THREE.MeshPhysicalMaterial({
+          color: new THREE.Color(this.cabColor), metalness: 0.35, roughness: 0.38,
+          clearcoat: 0.7, clearcoatRoughness: 0.08, envMapIntensity: 0.5,
+        });
+        this.modelPaints.push(m);
+        return m;
+      }
+      case 'chrome': return std({ color: 0xf2f4f7, metalness: 1, roughness: 0.07, envMapIntensity: 1.6 });
+      case 'mirror': return std({ color: 0xffffff, metalness: 1, roughness: 0.02, envMapIntensity: 2 });
+      case 'rim': return std({ color: 0xc9ced6, metalness: 1, roughness: 0.22, envMapIntensity: 1.4 });
+      case 'mattemetal': return std({ color: 0x8a9099, metalness: 0.85, roughness: 0.45 });
+      case 'tire': return std({ color: 0x141414, metalness: 0, roughness: 0.92, envMapIntensity: 0.4 });
+      case 'black': return std({ color: 0x0c0d0f, metalness: 0.15, roughness: 0.55, envMapIntensity: 0.8 });
+      case 'interior': return std({ color: 0x2a2b2e, metalness: 0, roughness: 0.85, envMapIntensity: 0.5 });
+      case 'windowglass': return glass(0x0a0f17, 0.82, { metalness: 0.2 });
+      case 'clearglass': return glass(0xffffff, 0.18);
+      case 'orangeglass': return glass(0xff8a1a, 0.85, { emissive: new THREE.Color(0xff6a00), emissiveIntensity: 0.35 });
+      case 'redglass': return glass(0xff1a1a, 0.85, { emissive: new THREE.Color(0xff0000), emissiveIntensity: 0.35 });
+      case 'yellow': return std({ color: base, metalness: 0, roughness: 0.3, emissive: new THREE.Color(0xffc400), emissiveIntensity: 0.5 });
+      default:
+        return std({
+          metalness: 0.1, roughness: 0.45,
+          ...(alpha < 1 ? { transparent: true, opacity: alpha, depthWrite: false } : {}),
+        });
+    }
   }
 
   // Positions des carrés sur le vrai modèle, en proportions de sa boîte englobante.
