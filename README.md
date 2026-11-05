@@ -2,7 +2,7 @@
 
 ![Aperçu](docs/apercu.png)
 
-Launcher Android pour autoradio (testé pour Junsun V1 Plus) façon Android Auto / CarPlay, pensé pour un camion :
+Launcher Android pour autoradio (conçu pour le Junsun V1 Plus) façon Android Auto / CarPlay, pensé pour un camion :
 
 | Écran | Contenu |
 |---|---|
