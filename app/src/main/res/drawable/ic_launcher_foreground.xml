@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Silhouette de tracteur (cabine avancée) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M30,34h22a4,4 0,0 1,4 4v26h20v8H26V38a4,4 0,0 1,4 -4z" />
+    <path android:fillColor="#93C5FD"
+        android:pathData="M33,40h16v10H33z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M60,58h18v6H60z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M35,72m-7,0a7,7 0,1 1,14 0a7,7 0,1 1,-14 0" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M68,72m-7,0a7,7 0,1 1,14 0a7,7 0,1 1,-14 0" />
+    <path android:fillColor="#2563EB"
+        android:pathData="M35,72m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0" />
+    <path android:fillColor="#2563EB"
+        android:pathData="M68,72m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0" />
+</vector>

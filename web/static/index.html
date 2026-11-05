@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Launcher Scania</title>
+  <link rel="stylesheet" href="vendor/leaflet.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="wallpaper"></div>
+
+  <nav id="rail">
+    <div class="rail-clock"><b id="rail-time">--:--</b><small id="rail-bt"></small></div>
+    <div class="rail-buttons">
+      <button class="rail-btn tile-home" data-screen="home" aria-label="Accueil"></button>
+      <button class="rail-btn tile-nav" data-screen="nav" aria-label="Navigation"></button>
+      <button class="rail-btn tile-music" data-action="music" aria-label="Musique"></button>
+      <button class="rail-btn tile-phone" data-action="phone" aria-label="Téléphone"></button>
+      <button class="rail-btn tile-truck" data-screen="vehicle" aria-label="Véhicule"></button>
+      <button class="rail-btn tile-apps" data-screen="apps" aria-label="Applications"></button>
+    </div>
+    <button class="rail-btn tile-settings" data-screen="settings" aria-label="Réglages"></button>
+  </nav>
+
+  <main id="screens">
+    <section class="screen" id="screen-home"></section>
+    <section class="screen" id="screen-nav"></section>
+    <section class="screen" id="screen-vehicle"></section>
+    <section class="screen" id="screen-apps"></section>
+    <section class="screen" id="screen-settings"></section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
