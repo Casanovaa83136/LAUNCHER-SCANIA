@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
 function radialTexture(stops, size = 256) {
   const c = document.createElement('canvas');
@@ -25,8 +27,22 @@ function box(w, h, d, mat, x, y, z, r = 0) {
   return m;
 }
 
+const MODEL_ROT = Math.PI / 2;
+const MODEL_LENGTH = 6.3;
+const MODEL_CENTER_X = -0.3;
+const MODEL_ANCHORS = [
+  { id: 'moteur', u: 1.0, v: 0.45, w: 0, normal: [1, 0, 0] },
+  { id: 'cabine', u: 0.74, v: 0.74, w: 1.02, normal: [0, 0, 1] },
+  { id: 'freins', u: 0.86, v: 0.36, w: 1.05, normal: [0, 0, 1] },
+  { id: 'pneus_av', u: 0.8, v: 0.1, w: 1.05, normal: [0, 0, 1] },
+  { id: 'transmission', u: 0.46, v: 0.08, w: 0.75, normal: null },
+  { id: 'carburant', u: 0.5, v: 0.27, w: 1.02, normal: [0, 0, 1] },
+  { id: 'pneus_ar', u: 0.16, v: 0.1, w: 1.05, normal: [0, 0, 1] },
+  { id: 'sellette', u: 0.2, v: 0.38, w: 0, normal: null },
+];
+
 export class Truck3D {
-  constructor(container, { cabColor = '#e8ecf1', accent = '#3b82f6', axles = '4x2', quality = 'auto' } = {}) {
+  constructor(container, { cabColor = '#e8ecf1', accent = '#3b82f6', axles = '4x2', quality = 'auto', modelUrl = null } = {}) {
     this.container = container;
     this.hotspots = [];
     this.running = false;
@@ -53,11 +69,11 @@ export class Truck3D {
     this.scene = scene;
 
     const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
-    camera.position.set(6.9, 3.1, 7.4);
+    camera.position.set(7.0, 3.0, 7.4);
     this.camera = camera;
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(-0.1, 1.3, 0);
+    controls.target.set(-0.3, 1.6, 0);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.enablePan = false;
@@ -86,6 +102,8 @@ export class Truck3D {
     this.truck = new THREE.Group();
     scene.add(this.truck);
     this.buildTruck(cabColor, axles);
+    this.cabColor = cabColor;
+    if (modelUrl) this.loadModel(modelUrl);
 
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(container);
@@ -325,9 +343,82 @@ export class Truck3D {
     ];
   }
 
-  setCabColor(c) { this.paint.color.set(c); this.wake(); }
+  // Modèle 3D réel (GLB). Le camion dessiné en code reste affiché si le chargement échoue.
+  loadModel(url) {
+    const loader = new GLTFLoader();
+    loader.setMeshoptDecoder(MeshoptDecoder);
+    loader.load(url, (gltf) => {
+      const model = gltf.scene;
+      // Le modèle est orienté sur l'axe z : on le tourne pour que l'avant regarde +x
+      model.rotation.y = MODEL_ROT;
+      model.updateMatrixWorld(true);
+      let box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const scale = MODEL_LENGTH / size.x;
+      model.scale.setScalar(scale);
+      model.updateMatrixWorld(true);
+      box = new THREE.Box3().setFromObject(model);
+      const c = box.getCenter(new THREE.Vector3());
+      model.position.set(MODEL_CENTER_X - c.x, -box.min.y, -c.z);
+      model.updateMatrixWorld(true);
+      this.modelBox = new THREE.Box3().setFromObject(model);
+
+      this.modelPaints = [];
+      model.traverse((o) => {
+        if (!o.isMesh) return;
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        mats.forEach((m) => {
+          const n = (m.name || '').toLowerCase();
+          if (n === 'carpaint') {
+            m.color.set(this.cabColor);
+            m.metalness = 0.5;
+            m.roughness = 0.25;
+            this.modelPaints.push(m);
+          } else if (n.includes('glass') || n === 'windowglass') {
+            m.transparent = true;
+            m.opacity = n === 'clearglass' ? 0.35 : 0.75;
+            m.metalness = 0.9;
+            m.roughness = 0.05;
+            if (n === 'windowglass') m.color.set(0x0b1420);
+          } else if (n === 'chrome' || n === 'mirror') {
+            m.metalness = 1; m.roughness = 0.12;
+          } else if (n === 'rim') {
+            m.metalness = 0.9; m.roughness = 0.3;
+          } else if (n === 'tire') {
+            m.metalness = 0; m.roughness = 0.9;
+          }
+          if (n.includes('orange') || n === 'yellow') { m.emissive = new THREE.Color(0xff8a00); m.emissiveIntensity = 0.6; }
+          if (n === 'redglass' || n === 'red') { m.emissive = new THREE.Color(0xff1010); m.emissiveIntensity = 0.4; }
+        });
+      });
+      this.scene.add(model);
+      this.model = model;
+      this.truck.visible = false;
+      this.defineModelHotspots();
+      this.wake();
+    }, undefined, (err) => console.warn('Modèle 3D non chargé, camion dessiné utilisé', err));
+  }
+
+  // Positions des carrés sur le vrai modèle, en proportions de sa boîte englobante.
+  // u : 0 = arrière, 1 = avant ; v : 0 = sol, 1 = toit ; w : -1 = gauche, +1 = droite (côté visible)
+  defineModelHotspots() {
+    const b = this.modelBox;
+    const P = (u, v, w) => [b.min.x + u * (b.max.x - b.min.x), b.min.y + v * (b.max.y - b.min.y), w * b.max.z];
+    this.anchorDefs = MODEL_ANCHORS.map((a) => ({ id: a.id, pos: P(a.u, a.v, a.w), normal: a.normal }));
+  }
+
+  setCabColor(c) {
+    this.cabColor = c;
+    this.paint.color.set(c);
+    if (this.modelPaints) this.modelPaints.forEach((m) => m.color.set(c));
+    this.wake();
+  }
   setAccent(c) { this.ringMat.color.set(c); this.rim.color.set(c); this.wake(); }
-  setAxles(a, cabColor) { this.buildTruck(cabColor, a); this.wake(); }
+  setAxles(a, cabColor) {
+    this.buildTruck(cabColor, a);
+    if (this.model) { this.truck.visible = false; this.defineModelHotspots(); }
+    this.wake();
+  }
 
   // hotspots : [{ id, node }] -> les éléments HTML sont positionnés par-dessus le canvas
   bindHotspots(list) { this.hotspots = list; this.wake(); }

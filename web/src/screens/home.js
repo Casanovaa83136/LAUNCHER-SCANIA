@@ -109,6 +109,7 @@ function initTruck() {
   try {
     truck = new Truck3D($('#h-stage', root), {
       cabColor: state.truck.cabColor, accent: state.settings.accent, axles: state.truck.axles, quality: state.settings.quality,
+      modelUrl: state.settings.realModel && state.settings.quality !== 'low' ? 'models/scania.glb' : null,
     });
     truck.bindHotspots(hotspotNodes);
     truck.autoRotate = state.settings.autoRotate;

@@ -98,6 +98,7 @@ function defaultState() {
       glass: false,
       hotspotLabels: true,
       wallpaper: 'sunset',
+      realModel: true,
     },
     maintenance: defaultMaintenance(km),
     history: [], // { id, itemId, name, km, date, cost, note }

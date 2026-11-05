@@ -43,11 +43,12 @@ function render() {
           <h3>${icon('Sun', 20)}Apparence</h3>
           <div class="field"><span>Couleur d'accent</span><div class="swatches">${ACCENTS.map((c) => `<button class="swatch ${c === s.accent ? 'on' : ''}" style="background:${c}" data-accent="${c}"></button>`).join('')}</div></div>
           <label class="field"><span>Fond d'écran</span><select data-setting="wallpaper">${WALLPAPERS.map(([k, l]) => `<option value="${k}" ${k === s.wallpaper ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+          <div class="line"><span>Modèle 3D réaliste du Scania (redémarrage)</span>${sw('realModel', s.realModel)}</div>
           <div class="line"><span>Rotation auto du camion</span>${sw('autoRotate', s.autoRotate)}</div>
           <div class="line"><span>Noms sous les carrés</span>${sw('hotspotLabels', s.hotspotLabels)}</div>
           <div class="line"><span>Effet verre flouté (plus gourmand)</span>${sw('glass', s.glass)}</div>
           <div class="line"><span>Plein écran (cacher la barre Android)</span>${sw('fullscreen', s.fullscreen)}</div>
-          <label class="field"><span>Qualité 3D (redémarrage du launcher)</span><select data-setting="quality"><option value="low" ${s.quality === 'low' ? 'selected' : ''}>Économie</option><option value="auto" ${s.quality === 'auto' ? 'selected' : ''}>Normale</option><option value="high" ${s.quality === 'high' ? 'selected' : ''}>Haute</option></select></label>
+          <label class="field"><span>Qualité 3D (redémarrage du launcher) — « Économie » utilise le camion simplifié</span><select data-setting="quality"><option value="low" ${s.quality === 'low' ? 'selected' : ''}>Économie</option><option value="auto" ${s.quality === 'auto' ? 'selected' : ''}>Normale</option><option value="high" ${s.quality === 'high' ? 'selected' : ''}>Haute</option></select></label>
         </section>
         <section>
           <h3>${icon('Map', 20)}Navigation</h3>
